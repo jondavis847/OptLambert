@@ -1,0 +1,17 @@
+const alpha = 2f-6 #MEUR/KG^2
+const cm, cM = 45,55 #MEUR
+const delTR,delTM = 30,30 #days
+const tw = 5 #days
+const TOF = 8 #years
+const mde,mdry,mp = 30,2000,5000 #KG
+const rpm = 6.6f6 #m
+const mu = 398600.4418f9 #m^3/sec^2
+const J2 = 1.08262668f-3 #m^3/sec^2
+const req = 6378137 #m
+const Isp = 340#sec
+const g0 = 9.80665 #m/sec^2
+const er = 100#m
+const ev = 1# m/sec
+const em = 1f-8#kg
+const day = 86400 #sec
+const year = 365.35 #days
