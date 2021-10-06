@@ -5,8 +5,8 @@ function oe2rv(t,o)
     oe = Data[o+1,:]
     t0,a,e,i,W0,w0,M0 = oe.t,oe.a,oe.e,oe.i,oe.W,oe.w,oe.M
 
-    t0 = t0*86400.0 #convert to seconds
-    t = t*86400.0
+    t0 = t0*day #convert to seconds
+    t = t*day
 
     n = sqrt(mu/a^3)
     p = a*(1-e^2)
@@ -73,22 +73,24 @@ function rv2oe(rv)
 end
 
 
-function sc(u0,tspan)
-    function f(u,p,t)
-
-        x,y,z = u[1:3]
-        dx,dy,dz = u[4:6]
-
-        r = sqrt(x^2+y^2+z^2) 
-        ddx = -(mu*x/r^3)*(1+3/2*J2*(req/r)^2*(1-5*(z^2/r^2)))
-        ddy = -(mu*y/r^3)*(1+3/2*J2*(req/r)^2*(1-5*(z^2/r^2)))
-        ddz = -(mu*z/r^3)*(1+3/2*J2*(req/r)^2*(3-5*(z^2/r^2)))
-        
-        du = [dx;dy;dz;ddx;ddy;ddz]
-        return du
-    end
-    prob = ODEProblem(f,u0,tspan)
-    #tp = LinRange(tspan[1],tspan[2],500) #for animating
-    sol = solve(prob, reltol = 1e-9, abstol = 1e-9)
+function sc(u0,tspan)   
+    prob2 = remake(prob;u0 = u0, tspan = tspan)
+    sol = solve(prob2;  reltol = 1e-9, abstol = 1e-9)
     return sol
 end
+
+
+function odefunc!(du,u,p,t)
+
+    x,y,z = @view u[1:3]
+    dx,dy,dz = dxyz =  @view u[4:6]
+
+    r = sqrt(x^2+y^2+z^2) 
+    du[1:3] = dxyz
+    du[4] = -(mu*x/r^3)*(1+3/2*J2*(req/r)^2*(1-5*(z^2/r^2)))
+    du[5] = -(mu*y/r^3)*(1+3/2*J2*(req/r)^2*(1-5*(z^2/r^2)))
+    du[6] = -(mu*z/r^3)*(1+3/2*J2*(req/r)^2*(3-5*(z^2/r^2)))
+
+    return nothing
+end
+prob = ODEProblem(odefunc!,zeros(6),(0,0))

@@ -2,7 +2,7 @@ using CSV,DataFrames
 
 Data = CSV.read(raw"C:\Users\jonda\Documents\julia\eas6722\Project\gtoc9-data\debris.csv",DataFrame)
 rename!(Data,["id","t","a","e","i","W","w","M"])
-
+insertcols!(Data,9, :state => trues(123))
 function updatedebris(t)    
     D2 = copy(Data)
     
@@ -32,48 +32,109 @@ function updatedebris(t)
     return D2
 end
 
-function getbyraan(low,up,t)
+function getortho(t,D)
     D2 = updatedebris(t)
-    i = (D2.W .> low) .& (D2.W .< up)
+    e = 0.25
+    poslow = mod(D2[D+1,:W] + pi/2 - e, 2*pi)    
+    posup = mod(D2[D+1,:W] + pi/2 + e, 2*pi)    
+    neglow = mod(D2[D+1,:W] - pi/2 - e, 2*pi)
+    negup = mod(D2[D+1,:W] - pi/2 + e, 2*pi)
+    
+    i = ((D2.W .> poslow) .& (D2.W .< posup) .| (D2.W .> neglow) .& (D2.W .< negup)) .& D2.state
+    # if we dont find any, find the most ortho debris
+    if sum(i) < 1        
+        W = D2[D+1,:W]
+        delW = abs.(D2.W.-W)
+        mini = min(delW[D2.state]...)
+        i = delW .== mini
+    end    
     out = D2[i,:]
-    return out
+    return out    
 end
 
-function getwindowdata(t,D1,D2)
-    tfrange = LinRange(t,t+1,72)    
+function getwindowdata(t,D1,D2,n)
+    tfrange = LinRange(t+0.5,t+0.7,n)    
     e = zeros(length(tfrange))
     m = zeros(length(tfrange))
     rp = zeros(length(tfrange))
 
-    for i = 2:length(tfrange)
-        print("...Working $i...")
+    for i = 1:length(tfrange)        
         v,e[i],m[i],prop = dolambert(D1,D2,t,tfrange[i])
         a,ec = rv2oe(prop.u[end])
-        rp[i] = a*(1-ec)
-        print("Done\n")
+        rp[i] = a*(1-ec)        
     end
 
-    Data2 = updatedebris(t)
-    dW = Data2[D2+1,:W] - Data2[D1+1,:W]
-    dw = Data2[D2+1,:w] - Data2[D1+1,:w]
+    #Data2 = updatedebris(t)
+    #dW = Data2[D2+1,:W] - Data2[D1+1,:W]
+    #dw = Data2[D2+1,:w] - Data2[D1+1,:w]
+    id = D2*ones(length(tfrange))
+    em = DataFrame(tf = tfrange,
+                    e = e,
+                    m = m,
+                    rp = rp,
+                    id = id)
 
-    em = DataFrame(tf = tfrange[2:end],
-                    e = e[2:end],
-                    m = m[2:end],
-                    rp = rp[2:end])
-    return em,dW
+    return em#,dW,dw
 end    
 
-function comparedebris(D,t)
-    eM = Vector{DataFrame}(undef,123)
-    dW = Vector{Float64}(undef, 123)
-    dw = Vector{Float64}(undef, 123)
-
-    Threads.@threads for  i = 1:123
-        print("Comparing $D to $(i-1)...\n")
-        if D != i-1            
-            eM[i], dW[i] ,dw[i]= getwindowdata(t,D,i-1)            
-        end
+function comparedebris(D,t)    
+    O = getortho(t,D)          
+    n = size(O,1)
+    if n < 4
+        m = 25
+    else
+        m = 5
     end
-    return eM,dW,dw
+    #print("Found $n debris with roughly orthogonal orbits\n")
+    eM = Vector{DataFrame}(undef,size(O,1))    
+
+    Threads.@threads for  i = 1:size(O,1)
+        #print("Comparing $D to $(i-1)...\n")        
+        eM[i] = getwindowdata(t,D,O[i,:].id,m)
+    end
+    return eM
+end
+
+function getraanstats(dW,EM)
+    m = zeros(123)
+    sd = zeros(123)
+    mini = zeros(123)
+    maxi = zeros(123)
+    s3p = zeros(123)
+    s3m = zeros(123)
+    
+    for i = 2:123
+        validerror = EM[i].e .< 100
+        validrp = EM[i].rp .> 6.6e6
+        v = (validerror .& validrp)
+        m[i] = mean(EM[i].m[v])
+        sd[i] = std(EM[i].m[v])
+        mini[i] = min(EM[i].m[v]...)
+        maxi[i] = max(EM[i].m[v]...)        
+    end   
+
+    scatter(dW[2:end],m[2:end], xlabel = "RAAN diff (rad)", ylabel = "(kg)", title = "Piece 0 to all, T = 24000 days, 1 day window, 20 min increment", label = "mean", size = (1000,600))    
+    scatter!(dW[2:end],mini[2:end],color = :orange, label = "min")
+    scatter!(dW[2:end],maxi[2:end],color = :red, label = "max")
+    
+end
+
+function gettimestats(t0,EM)
+    n = size(EM,1)
+    m = zeros(n)    
+    mini = zeros(n)
+    maxi = zeros(n)
+    tf = LinRange(t0+0.5,t0+.7,5) 
+    tf = tf[2:end]
+    for i = 1:n
+        validerror = EM[i].e .< 100
+        validrp = EM[i].rp .> 6.6e6
+        v = (validerror .& validrp)
+        m[i] = mean(EM[i].m[v])        
+        mini[i] = min(EM[i].m[v]...)
+        maxi[i] = max(EM[i].m[v]...)        
+    end   
+    scatter(tf[2:end],m[2:end], xlabel = "Tf (days)", ylabel = "(kg)", title = "Piece 0 to ortho, T = 24000 days, 0.2 day window, 60 min increment", label = "mean", size = (1000,600))    
+    scatter!(tf[2:end],mini[2:end],color = :orange, label = "min")
+    scatter!(tf[2:end],maxi[2:end],color = :red, label = "max")
 end

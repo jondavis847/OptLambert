@@ -1,14 +1,13 @@
 using GalacticOptim, Optim
 
 function objlambert(v,p)  
-    r1 = p[1:3]  
-    r2 = p[4:6]
+    r1 = @view p[1:3]  
+    r2 = @view p[4:6]
     t1 = p[7]
     t2 = p[8]
 
-    x = [r1;v]
-    T = t2-t1
-    sol = sc(x,T)
+    x = [r1;v]    
+    sol = sc(x,(t1,t2))
     rf = sol.u[end,1][1:3]
 
     er = rf - r2
@@ -20,7 +19,7 @@ function optlambert(D1,D2,t1,t2)
     r1 = D1.r
     v0 = D1.v
     r2 = D2.r
-    p = [r1;r2;t1*86400;t2*86400]   
+    p = [r1;r2;t1*day;t2*day]   
 
     fobj = OptimizationFunction(objlambert, GalacticOptim.AutoForwardDiff())
     prob = OptimizationProblem(fobj,v0,p)
@@ -37,7 +36,7 @@ function dolambert(N1,N2,T1,T2)
     sol = optlambert(R1,R2,T1,T2)    
 
     x0 = [R1.r;sol.u]   
-    tspan = (T1*86400,T2*86400) 
+    tspan = (T1*day,T2*day) 
     prop = sc(x0,tspan)
     rf = prop.u[end][1:3]
 
@@ -58,12 +57,5 @@ function dolambert(N1,N2,T1,T2)
 
     m = m1+m2
 
-    return sol.u,emag,m#,prop
+    return sol.u,emag,m,prop
 end
-
-
-
-
-
-
-    

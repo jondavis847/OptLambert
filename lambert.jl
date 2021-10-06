@@ -18,9 +18,9 @@ function lambert(R0,Rf,T;
     
     #(1) Given: r(0),r(f),t(f)-t(0)
     # Normalize to canonical units    
-    km2ctu = 1/R
-    R0 = R0*km2ctu #cdu
-    Rf = Rf*km2ctu #cdu
+    km2cdu = 1/R
+    R0 = R0*km2cdu/1000 #cdu
+    Rf = Rf*km2cdu/1000 #cdu
     
     s2ctu = 1/sqrt(R^3/mu) #sec
     T = T*s2ctu #ctu
@@ -73,7 +73,7 @@ function lambert(R0,Rf,T;
     epsilon = 1f-8
     ctr = 0    
     iterationlimit = 1000    
-    at0 = -1 #first guess
+    at0 = 1 #first guess
     sf0 = 1  #first guess
     del = [1;1] #kickstart
 
@@ -114,7 +114,7 @@ function lambert(R0,Rf,T;
     udot0 = 1/(sf0*cc(1))*(uf0-u0*cc(0)) #(37)
     B = 2/r0*[u0[1] -u0[2] -u0[3] u0[4]; u0[2] u0[1] -u0[4] -u0[3]; u0[3] u0[4] u0[1] u0[2]] #(39)
     v0 = B*udot0 #(38)    
-    v0 = v0*(s2ctu/km2ctu) #convert back from canonical units to metric units
+    v0 = v0*(s2ctu/km2cdu) #convert back from canonical units to metric units
 
  #=
     #Solve the integrals in equations 76-79
